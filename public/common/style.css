@@ -1,0 +1,223 @@
+.pricing-content,
+.pricing_design,
+.ticker > div {
+  position: relative;
+}
+.ticker {
+  padding: 10px 0;
+  color: #fff;
+}
+.ticker > div {
+  height: 20px;
+  overflow: hidden;
+}
+.ticker > div > div {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 20px;
+  line-height: 20px;
+  white-space: nowrap;
+}
+tbody {
+  vertical-align: top;
+}
+blockquote {
+  color: #495057;
+  border-left: 5px solid #dee2e6;
+  padding: 18px 25px 18px 22px;
+  background-color: #f8f9fa;
+  quotes: "â" "â" "â" "â";
+}
+blockquote:before {
+  color: #ccc;
+  content: open-quote;
+  font-size: 4em;
+  line-height: 0.1em;
+  vertical-align: -0.4em;
+  margin-left: -0.5rem;
+}
+.pricing_design {
+  margin: 0 15px;
+}
+.pricing_design .single-pricing {
+  background: #554c86;
+  padding: 60px 40px;
+  border-radius: 30px;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+  position: relative;
+  z-index: 1;
+}
+.pricing_design .single-pricing:before {
+  content: "";
+  background-color: #fff;
+  width: 100%;
+  height: 100%;
+  border-radius: 18px 18px 190px;
+  border: 1px solid #eee;
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  z-index: -1;
+}
+.dropdown-menu {
+  left: inherit !important;
+  right: 0;
+}
+.flex-gallery {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin: 0 auto;
+}
+.flex-item {
+  flex: 1 1 100px;
+  overflow: hidden;
+}
+.flex-item img {
+  width: 100%;
+  height: auto;
+  display: block;
+  transition: transform 0.3s;
+  max-height: 100px;
+  object-fit: cover;
+  max-width: 228px;
+}
+.flex-item img:hover {
+  transform: scale(1.05);
+}
+.tooltip * {
+  color: #000 !important;
+}
+.tooltip .tooltip-inner {
+  background-color: #fff !important;
+  border: 1px solid #ccc;
+}
+.tooltip.bs-tooltip-auto[x-placement^="right"] .arrow::before,
+.tooltip.bs-tooltip-right .arrow::before {
+  border-right-color: #fff;
+}
+.tooltip.bs-tooltip-auto[x-placement^="left"] .arrow::before,
+.tooltip.bs-tooltip-left .arrow::before {
+  border-left-color: #fff;
+}
+.tooltip.bs-tooltip-auto[x-placement^="top"] .arrow::before,
+.tooltip.bs-tooltip-top .arrow::before {
+  border-top-color: #fff;
+}
+.tooltip.bs-tooltip-auto[x-placement^="bottom"] .arrow::before,
+.tooltip.bs-tooltip-bottom .arrow::before {
+  border-bottom-color: #fff;
+}
+img.main-nav-image {
+  margin-right: 10px;
+}
+@media (max-width: 768px) {
+  .navbar {
+    overflow: hidden;
+  }
+  .navbar-nav * {
+    font-size: 14px !important;
+  }
+  .navbar .dropdown-menu {
+    border: unset;
+    padding: 0;
+    margin-left: 10px;
+  }
+  .navbar .navbar-nav .nav-link {
+    padding: 5px 0;
+  }
+  .search-form {
+    margin-left: 6px;
+  }
+  .search-form #search {
+    width: 80% !important;
+  }
+  .navbar img.main-nav-image {
+    width: 20px;
+    height: 20px;
+  }
+}
+@media (min-width: 992px) {
+  .navbar .nav-item .dropdown-menu {
+    display: block;
+    visibility: hidden;
+    top: 100%;
+    transform: rotateX(-75deg);
+    transform-origin: 0% 0%;
+    transition: 0.5s;
+    opacity: 0;
+  }
+  .navbar .nav-item:hover > .dropdown-menu {
+    transform: rotateX(0);
+    visibility: visible;
+    transition: 0.5s;
+    opacity: 1;
+  }
+}
+.portfolio-container .property-item a img {
+  border: 1px solid #6e6e6e;
+  padding: 5px;
+}
+.owl-dots {
+  text-align: center;
+  margin-top: 20px;
+}
+.owl-dot {
+  display: inline-block;
+  height: 12px;
+  width: 12px;
+  background-color: #ccc !important;
+  margin: 5px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+.owl-dot.active {
+  background-color: #333 !important;
+}
+.owl-carousel.portfolio-container img {
+  height: 300px;
+  object-fit: cover;
+}
+.object-fit-cover {
+  object-fit: cover;
+}
+/*.owl-carousel .services__item{min-height: 300px;}*/
+/*
+.ah-item {
+  
+    display: table-cell !important;
+    float: none !important;    width: 100% !important;
+}
+
+.ah .owl-stage {
+    display: flex !important;
+}
+
+.ah .owl-item {
+   display: flex !important;
+    float: none !important;    width: 100% !important;
+}
+
+.ah .owl-item > div {
+    display: contents !important;
+    flex: 1; 
+    width: 100%;
+}
+
+.ah .ah-item {
+    display: flex !important;
+    flex-direction: column !important; 
+    flex: 1;
+    width: 100%;
+    margin-right: 10px !important;
+
+}
+
+.ah .ah-item .btnfoot {
+    margin-top: auto !important;
+}
+
+*/

@@ -1,0 +1,149 @@
+.modern-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 1000;
+  transition: all var(--transition-normal);
+  background: transparent;
+}
+
+.modern-header.scrolled {
+  background: var(--card-bg);
+  box-shadow: var(--shadow-md);
+  padding: 0.5rem 0;
+}
+
+.topbar-modern {
+  background: var(--foreground);
+  color: var(--background);
+  font-size: 0.85rem;
+  transition: opacity var(--transition-fast), height var(--transition-fast);
+}
+
+.topbar-modern a {
+  color: var(--background-alt);
+  opacity: 0.8;
+}
+
+.topbar-modern a:hover {
+  color: var(--primary);
+  opacity: 1;
+}
+
+.navbar-modern {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  transition: padding var(--transition-normal);
+}
+
+.scrolled .navbar-modern {
+  padding: 0.5rem 0;
+}
+
+.logo-brand {
+  text-decoration: none;
+}
+
+.logo-img {
+  height: 60px;
+  object-fit: contain;
+  transition: height var(--transition-normal);
+}
+
+.scrolled .logo-img {
+  height: 50px;
+}
+
+.nav-menu {
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: 2rem;
+  margin: 0;
+  padding: 0;
+}
+
+.nav-item-modern {
+  position: relative;
+}
+
+.nav-link-modern {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--foreground);
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+}
+
+.nav-link-modern:hover {
+  color: var(--primary);
+}
+
+.nav-link-modern::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 2px;
+  background: var(--primary);
+  transition: width var(--transition-fast);
+}
+
+.nav-link-modern:hover::after {
+  width: 100%;
+}
+
+/* CSS-based Hover Dropdowns */
+.dropdown-modern {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 200px;
+  list-style: none;
+  padding: 0.5rem;
+  margin: 0;
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(10px);
+  transition: all var(--transition-fast);
+  pointer-events: none;
+}
+
+.has-dropdown:hover .dropdown-modern {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.dropdown-item-modern {
+  display: block;
+  padding: 0.75rem 1rem;
+  color: var(--foreground);
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  font-size: 0.95rem;
+}
+
+.dropdown-item-modern:hover {
+  background: var(--primary-light);
+  color: white;
+  transform: translateX(5px);
+}
+
+.mobile-toggle {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+.text-xs {
+  font-size: 0.75rem;
+}
