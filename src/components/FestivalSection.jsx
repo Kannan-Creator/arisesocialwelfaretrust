@@ -39,6 +39,11 @@ export default function FestivalSection() {
     const unlock = () => {
       const ctx = getAudioContext();
       if (ctx && ctx.state === "suspended") ctx.resume();
+      try {
+        const dummy = new Audio("/audio/rocket-launch.wav");
+        dummy.volume = 0;
+        dummy.play().then(() => dummy.pause()).catch(() => {});
+      } catch {}
     };
     window.addEventListener("click", unlock, { passive: true, once: true });
     window.addEventListener("touchstart", unlock, { passive: true, once: true });
@@ -49,6 +54,21 @@ export default function FestivalSection() {
   }, []);
 
   const playCrackerSound = (type = "blast") => {
+    if (!soundEnabled || typeof window === "undefined") return;
+    try {
+      const src = type === "launch" ? "/audio/rocket-launch.wav" : "/audio/cracker-blast.wav";
+      const audio = new Audio(src);
+      audio.volume = type === "launch" ? 0.7 : 0.85;
+      const promise = audio.play();
+      if (promise !== undefined) {
+        promise.catch(() => playSynthCrackerSound(type));
+      }
+    } catch {
+      playSynthCrackerSound(type);
+    }
+  };
+
+  const playSynthCrackerSound = (type = "blast") => {
     if (!soundEnabled) return;
     try {
       const ctx = getAudioContext();

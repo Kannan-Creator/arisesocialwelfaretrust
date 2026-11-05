@@ -22,3 +22,4 @@ When interacting with Cloudflare, use the cf CLI unless the project has a Wrangl
   - Deployment via GitHub: pushes to `main` branch trigger automated Cloudflare Pages builds.
 
 <!-- END:cloudflare-agent-rules -->
+
