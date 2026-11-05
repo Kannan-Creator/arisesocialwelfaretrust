@@ -180,9 +180,10 @@ export default function HeroCarousel() {
           inset: 0;
           background: linear-gradient(
             180deg,
-            rgba(0,0,0,0.78) 0%,
-            rgba(0,0,0,0.52) 40%,
-            rgba(20,10,0,0.75) 100%
+            rgba(0, 0, 0, 0.42) 0%,
+            rgba(0, 0, 0, 0.18) 35%,
+            rgba(0, 0, 0, 0.20) 65%,
+            rgba(15, 8, 2, 0.48) 100%
           );
           z-index: 1;
         }
@@ -274,22 +275,24 @@ export default function HeroCarousel() {
           letter-spacing: -1.5px;
           margin-bottom: 1.25rem;
           opacity: 0;
-          text-shadow: 0 4px 30px rgba(0,0,0,0.5);
+          text-shadow: 0 3px 18px rgba(0, 0, 0, 0.85), 0 6px 36px rgba(0, 0, 0, 0.7);
         }
         .hero-title-accent {
-          background: linear-gradient(90deg, var(--primary), #ffcc44);
+          background: linear-gradient(90deg, #ff9500, #ffcc44);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
           background-clip: text;
+          filter: drop-shadow(0 2px 10px rgba(0, 0, 0, 0.8));
         }
 
         .hero-desc {
           font-size: clamp(1rem, 2vw, 1.22rem);
-          color: rgba(255,255,255,0.82);
+          color: #ffffff;
           max-width: 680px;
           margin: 0 auto 2.2rem;
           line-height: 1.7;
           opacity: 0;
+          text-shadow: 0 2px 12px rgba(0, 0, 0, 0.85), 0 4px 20px rgba(0, 0, 0, 0.6);
         }
 
         .hero-actions {
