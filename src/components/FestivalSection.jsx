@@ -35,40 +35,28 @@ export default function FestivalSection() {
     }
   };
 
+  // Warm up audio context on any user interaction anywhere on the page
   useEffect(() => {
-    const unlock = () => {
+    const unlockAudio = () => {
       const ctx = getAudioContext();
-      if (ctx && ctx.state === "suspended") ctx.resume();
-      try {
-        const dummy = new Audio("/audio/rocket-launch.wav");
-        dummy.volume = 0;
-        dummy.play().then(() => dummy.pause()).catch(() => {});
-      } catch {}
+      if (ctx && ctx.state === "suspended") {
+        ctx.resume();
+      }
     };
-    window.addEventListener("click", unlock, { passive: true, once: true });
-    window.addEventListener("touchstart", unlock, { passive: true, once: true });
+
+    window.addEventListener("click", unlockAudio, { passive: true });
+    window.addEventListener("touchstart", unlockAudio, { passive: true });
+    window.addEventListener("keydown", unlockAudio, { passive: true });
+
     return () => {
-      window.removeEventListener("click", unlock);
-      window.removeEventListener("touchstart", unlock);
+      window.removeEventListener("click", unlockAudio);
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
     };
   }, []);
 
+  // ─── Realistic Firecracker Sound Generator ───
   const playCrackerSound = (type = "blast") => {
-    if (!soundEnabled || typeof window === "undefined") return;
-    try {
-      const src = type === "launch" ? "/audio/rocket-launch.wav" : "/audio/cracker-blast.wav";
-      const audio = new Audio(src);
-      audio.volume = type === "launch" ? 0.7 : 0.85;
-      const promise = audio.play();
-      if (promise !== undefined) {
-        promise.catch(() => playSynthCrackerSound(type));
-      }
-    } catch {
-      playSynthCrackerSound(type);
-    }
-  };
-
-  const playSynthCrackerSound = (type = "blast") => {
     if (!soundEnabled) return;
     try {
       const ctx = getAudioContext();
@@ -76,50 +64,82 @@ export default function FestivalSection() {
       const now = ctx.currentTime;
 
       if (type === "launch") {
+        // Rocket launch rising whistle
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(340, now);
-        osc.frequency.exponentialRampToValueAtTime(1500, now + 0.28);
-        gain.gain.setValueAtTime(0.12, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.29);
-      } else {
-        // Deep bass explosion thud
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(130, now);
-        osc.frequency.exponentialRampToValueAtTime(32, now + 0.2);
-        gain.gain.setValueAtTime(0.5, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.start(now);
-        osc.stop(now + 0.21);
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(1600, now + 0.32);
 
-        // Crackle noise burst
-        const bufferSize = Math.floor(ctx.sampleRate * 0.16);
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(2200, now);
+
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.33);
+      } else {
+        // 1. Deep Bass Boom (The heavy concussive explosion thud)
+        const boomOsc = ctx.createOscillator();
+        const boomGain = ctx.createGain();
+        boomOsc.type = "triangle";
+        boomOsc.frequency.setValueAtTime(140, now);
+        boomOsc.frequency.exponentialRampToValueAtTime(30, now + 0.22);
+
+        boomGain.gain.setValueAtTime(0.65, now);
+        boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+        boomOsc.connect(boomGain);
+        boomGain.connect(ctx.destination);
+        boomOsc.start(now);
+        boomOsc.stop(now + 0.26);
+
+        // 2. Gunpowder Snap & Crackle (Bandpass filtered white noise)
+        const bufferSize = Math.floor(ctx.sampleRate * 0.22);
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+          const decay = Math.exp(-i / (bufferSize * 0.25));
+          const crackle = Math.random() > 0.82 ? (Math.random() * 2 - 1) * 1.6 : (Math.random() * 2 - 1) * 0.4;
+          data[i] = crackle * decay;
         }
+
         const noise = ctx.createBufferSource();
         noise.buffer = buffer;
-        const filter = ctx.createBiquadFilter();
-        filter.type = "bandpass";
-        filter.frequency.setValueAtTime(1200, now);
+
+        const bandpass = ctx.createBiquadFilter();
+        bandpass.type = "bandpass";
+        bandpass.frequency.setValueAtTime(1100 + Math.random() * 400, now);
+        bandpass.Q.setValueAtTime(1.8, now);
+
         const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.55, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
-        noise.connect(filter);
-        filter.connect(noiseGain);
+        noiseGain.gain.setValueAtTime(0.75, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+        noise.connect(bandpass);
+        bandpass.connect(noiseGain);
         noiseGain.connect(ctx.destination);
         noise.start(now);
+
+        // 3. Trailing Sizzle Crackles (sparklers sizzling)
+        for (let s = 1; s <= 3; s++) {
+          const popTime = now + 0.05 * s + Math.random() * 0.03;
+          const popOsc = ctx.createOscillator();
+          const popGain = ctx.createGain();
+          popOsc.type = "square";
+          popOsc.frequency.setValueAtTime(900 + Math.random() * 700, popTime);
+          popGain.gain.setValueAtTime(0.12, popTime);
+          popGain.gain.exponentialRampToValueAtTime(0.001, popTime + 0.035);
+          popOsc.connect(popGain);
+          popGain.connect(ctx.destination);
+          popOsc.start(popTime);
+          popOsc.stop(popTime + 0.04);
+        }
       }
     } catch {
       // Audio autoplay restrictions; fail silently
