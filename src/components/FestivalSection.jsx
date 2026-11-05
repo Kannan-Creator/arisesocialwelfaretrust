@@ -5,22 +5,19 @@ export default function FestivalSection() {
   const [diyasLit, setDiyasLit] = useState([true, true, true, true, true]);
   const [copiedWish, setCopiedWish] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [showWelcomeBanner, setShowWelcomeBanner] = useState(true);
 
   const canvasRef = useRef(null);
-  const welcomeCanvasRef = useRef(null);
   const sectionRef = useRef(null);
-  const animationRef = useRef(null);
-  const welcomeAnimationRef = useRef(null);
   const audioCtxRef = useRef(null);
+  const animationFrameId = useRef(null);
+  const isLoopRunning = useRef(false);
+  const isVisible = useRef(true);
 
-  // Entities: rockets shooting from bottom, and firework spark streaks
-  const rocketsRef = useRef([]);
-  const sparksRef = useRef([]);
-  const welcomeRocketsRef = useRef([]);
-  const welcomeSparksRef = useRef([]);
+  // High-performance particle pools (flat arrays, zero per-frame object allocations)
+  const rockets = useRef([]);
+  const sparks = useRef([]);
 
-  // ─── Initialize / Resume Web Audio Context on User Gesture ───
+  // ─── Lightweight Web Audio Engine ───
   const getAudioContext = () => {
     if (typeof window === "undefined") return null;
     try {
@@ -38,27 +35,19 @@ export default function FestivalSection() {
     }
   };
 
-  // Warm up audio context on any user interaction anywhere on the page
   useEffect(() => {
-    const unlockAudio = () => {
+    const unlock = () => {
       const ctx = getAudioContext();
-      if (ctx && ctx.state === "suspended") {
-        ctx.resume();
-      }
+      if (ctx && ctx.state === "suspended") ctx.resume();
     };
-
-    window.addEventListener("click", unlockAudio, { passive: true });
-    window.addEventListener("touchstart", unlockAudio, { passive: true });
-    window.addEventListener("keydown", unlockAudio, { passive: true });
-
+    window.addEventListener("click", unlock, { passive: true, once: true });
+    window.addEventListener("touchstart", unlock, { passive: true, once: true });
     return () => {
-      window.removeEventListener("click", unlockAudio);
-      window.removeEventListener("touchstart", unlockAudio);
-      window.removeEventListener("keydown", unlockAudio);
+      window.removeEventListener("click", unlock);
+      window.removeEventListener("touchstart", unlock);
     };
   }, []);
 
-  // ─── Realistic Firecracker Sound Generator ───
   const playCrackerSound = (type = "blast") => {
     if (!soundEnabled) return;
     try {
@@ -67,132 +56,108 @@ export default function FestivalSection() {
       const now = ctx.currentTime;
 
       if (type === "launch") {
-        // Rocket launch rising whistle
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
         osc.type = "sawtooth";
-        osc.frequency.setValueAtTime(320, now);
-        osc.frequency.exponentialRampToValueAtTime(1600, now + 0.32);
-
-        const filter = ctx.createBiquadFilter();
-        filter.type = "lowpass";
-        filter.frequency.setValueAtTime(2200, now);
-
-        gain.gain.setValueAtTime(0.18, now);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
-
-        osc.connect(filter);
-        filter.connect(gain);
+        osc.frequency.setValueAtTime(340, now);
+        osc.frequency.exponentialRampToValueAtTime(1500, now + 0.28);
+        gain.gain.setValueAtTime(0.12, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+        osc.connect(gain);
         gain.connect(ctx.destination);
         osc.start(now);
-        osc.stop(now + 0.33);
+        osc.stop(now + 0.29);
       } else {
-        // 1. Deep Bass Boom (The heavy concussive explosion thud)
-        const boomOsc = ctx.createOscillator();
-        const boomGain = ctx.createGain();
-        boomOsc.type = "triangle";
-        boomOsc.frequency.setValueAtTime(140, now);
-        boomOsc.frequency.exponentialRampToValueAtTime(30, now + 0.22);
+        // Deep bass explosion thud
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = "triangle";
+        osc.frequency.setValueAtTime(130, now);
+        osc.frequency.exponentialRampToValueAtTime(32, now + 0.2);
+        gain.gain.setValueAtTime(0.5, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.21);
 
-        boomGain.gain.setValueAtTime(0.65, now);
-        boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
-
-        boomOsc.connect(boomGain);
-        boomGain.connect(ctx.destination);
-        boomOsc.start(now);
-        boomOsc.stop(now + 0.26);
-
-        // 2. Gunpowder Snap & Crackle (Bandpass filtered white noise)
-        const bufferSize = Math.floor(ctx.sampleRate * 0.22);
+        // Crackle noise burst
+        const bufferSize = Math.floor(ctx.sampleRate * 0.16);
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-          const decay = Math.exp(-i / (bufferSize * 0.25));
-          const crackle = Math.random() > 0.82 ? (Math.random() * 2 - 1) * 1.6 : (Math.random() * 2 - 1) * 0.4;
-          data[i] = crackle * decay;
+          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
         }
-
         const noise = ctx.createBufferSource();
         noise.buffer = buffer;
-
-        const bandpass = ctx.createBiquadFilter();
-        bandpass.type = "bandpass";
-        bandpass.frequency.setValueAtTime(1100 + Math.random() * 400, now);
-        bandpass.Q.setValueAtTime(1.8, now);
-
+        const filter = ctx.createBiquadFilter();
+        filter.type = "bandpass";
+        filter.frequency.setValueAtTime(1200, now);
         const noiseGain = ctx.createGain();
-        noiseGain.gain.setValueAtTime(0.75, now);
-        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
-
-        noise.connect(bandpass);
-        bandpass.connect(noiseGain);
+        noiseGain.gain.setValueAtTime(0.55, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+        noise.connect(filter);
+        filter.connect(noiseGain);
         noiseGain.connect(ctx.destination);
         noise.start(now);
-
-        // 3. Trailing Sizzle Crackles (sparklers sizzling)
-        for (let s = 1; s <= 3; s++) {
-          const popTime = now + 0.05 * s + Math.random() * 0.03;
-          const popOsc = ctx.createOscillator();
-          const popGain = ctx.createGain();
-          popOsc.type = "square";
-          popOsc.frequency.setValueAtTime(900 + Math.random() * 700, popTime);
-          popGain.gain.setValueAtTime(0.12, popTime);
-          popGain.gain.exponentialRampToValueAtTime(0.001, popTime + 0.035);
-          popOsc.connect(popGain);
-          popGain.connect(ctx.destination);
-          popOsc.start(popTime);
-          popOsc.stop(popTime + 0.04);
-        }
       }
     } catch {
       // Audio autoplay restrictions; fail silently
     }
   };
 
-  // ─── Launch a Rocket from the Bottom of the Canvas ───
-  const launchRocket = (rocketsArray, sparksArray, canvasWidth, canvasHeight, startXRatio, targetYRatio) => {
-    const x = canvasWidth * startXRatio;
-    const targetY = canvasHeight * targetYRatio;
-    const vy = -(11 + Math.random() * 4.5);
-    const vx = (Math.random() - 0.5) * 1.8;
+  // ─── High-Performance Rocket Launch ───
+  const launchRocket = (startXRatio, targetYRatio) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Hard limit on active rockets to avoid performance degradation
+    if (rockets.current.length >= 8) return;
+
+    const x = canvas.width * startXRatio;
+    const targetY = canvas.height * targetYRatio;
 
     const colors = [
-      ["#ff1744", "#ff5252", "#ffd700"],
-      ["#ff9100", "#ffea00", "#ffffff"],
-      ["#00e676", "#69f0ae", "#ffd700"],
-      ["#00e5ff", "#80d8ff", "#ffffff"],
-      ["#d500f9", "#ea80fc", "#ffd700"],
-      ["#ffd700", "#ffab00", "#ff6d00"],
+      ["#ff3b30", "#ff9500", "#ffcc00"],
+      ["#ff9500", "#ffd60a", "#ffffff"],
+      ["#34c759", "#30d158", "#ffd60a"],
+      ["#00c7be", "#32ade6", "#ffffff"],
+      ["#af52de", "#bf5af2", "#ffd60a"],
+      ["#ffd60a", "#ff9f0a", "#ff453a"],
     ];
     const burstColorSet = colors[Math.floor(Math.random() * colors.length)];
 
     playCrackerSound("launch");
 
-    rocketsArray.push({
+    rockets.current.push({
       x,
-      y: canvasHeight - 5,
+      y: canvas.height,
       prevX: x,
-      prevY: canvasHeight - 5,
-      vx,
-      vy,
+      prevY: canvas.height,
+      vx: (Math.random() - 0.5) * 1.5,
+      vy: -(12 + Math.random() * 3.5),
       targetY,
-      burstColors: burstColorSet,
-      trail: [],
-      sparksTarget: sparksArray,
+      colors: burstColorSet,
     });
+
+    startAnimationLoop();
   };
 
-  // ─── Real Firecracker Explosion (Streaks with Motion Tails, NOT simple dots) ───
-  const explodeRocket = (sparksArray, x, y, colors) => {
+  // ─── Real Firecracker Burst (Hardware Accelerated 'lighter' streaks) ───
+  const explodeRocket = (x, y, colors) => {
     playCrackerSound("blast");
 
-    const count = 75 + Math.floor(Math.random() * 35);
-    for (let i = 0; i < count; i++) {
-      const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.28;
-      const speed = 2.8 + Math.random() * 6.8;
-      const color = colors[Math.floor(Math.random() * colors.length)];
+    // Cap maximum sparks at 50 to maintain solid 60fps on all devices
+    const count = 45 + Math.floor(Math.random() * 15);
+    const availableSlots = 180 - sparks.current.length;
+    const finalCount = Math.min(count, Math.max(10, availableSlots));
 
-      sparksArray.push({
+    for (let i = 0; i < finalCount; i++) {
+      const angle = (Math.PI * 2 * i) / finalCount + (Math.random() - 0.5) * 0.25;
+      const speed = 2.4 + Math.random() * 5.2;
+      const color = colors[i % colors.length];
+
+      sparks.current.push({
         x,
         y,
         prevX: x,
@@ -201,241 +166,103 @@ export default function FestivalSection() {
         vy: Math.sin(angle) * speed,
         color,
         alpha: 1,
-        decay: 0.013 + Math.random() * 0.015,
-        gravity: 0.12,
-        friction: 0.965,
-        flicker: Math.random() > 0.35,
-        tailLength: 6 + Math.random() * 5,
-        history: [{ x, y }],
-      });
-    }
-
-    // Micro crackling sparks (golden glitter sizzle)
-    for (let k = 0; k < 25; k++) {
-      const angle = Math.random() * Math.PI * 2;
-      const speed = 1.2 + Math.random() * 3.5;
-      sparksArray.push({
-        x: x + (Math.random() - 0.5) * 10,
-        y: y + (Math.random() - 0.5) * 10,
-        prevX: x,
-        prevY: y,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
-        color: "#ffffff",
-        alpha: 1,
-        decay: 0.025 + Math.random() * 0.02,
-        gravity: 0.08,
-        friction: 0.94,
-        flicker: true,
-        tailLength: 3,
-        history: [{ x, y }],
+        decay: 0.018 + Math.random() * 0.016, // Fast cleanup
       });
     }
   };
 
-  // ─── Update & Render Rocket & Real Firecracker Streaks ───
-  const processCanvasFrame = (ctx, canvas, rocketsArray, sparksArray) => {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  // ─── Optimized Render Loop (Runs ONLY when particles exist) ───
+  const startAnimationLoop = () => {
+    if (isLoopRunning.current) return;
+    isLoopRunning.current = true;
 
-    // 1. Update & Render Rockets climbing from bottom
-    for (let i = rocketsArray.length - 1; i >= 0; i--) {
-      const r = rocketsArray[i];
-      r.prevX = r.x;
-      r.prevY = r.y;
-      r.x += r.vx;
-      r.y += r.vy;
-      r.vy += 0.12; // gravity slowing down rocket climbing
+    const render = () => {
+      const canvas = canvasRef.current;
+      if (!canvas || !isVisible.current) {
+        isLoopRunning.current = false;
+        return;
+      }
 
-      r.trail.push({ x: r.x, y: r.y });
-      if (r.trail.length > 7) r.trail.shift();
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw burning rocket tail streak
-      if (r.trail.length > 1) {
-        ctx.save();
-        ctx.strokeStyle = "#ffd700";
+      // Hardware-accelerated additive blending (creates neon glow with ZERO CPU shadowBlur)
+      ctx.globalCompositeOperation = "lighter";
+
+      const rocketList = rockets.current;
+      const sparkList = sparks.current;
+
+      // 1. Process Rockets
+      for (let i = rocketList.length - 1; i >= 0; i--) {
+        const r = rocketList[i];
+        r.prevX = r.x;
+        r.prevY = r.y;
+        r.x += r.vx;
+        r.y += r.vy;
+        r.vy += 0.14; // Gravity deceleration
+
+        // Draw rocket blazing streak (direct line, zero array shift overhead)
+        ctx.strokeStyle = "#ffd60a";
         ctx.lineWidth = 2.5;
-        ctx.lineCap = "round";
-        ctx.shadowColor = "#ff9100";
-        ctx.shadowBlur = 10;
         ctx.beginPath();
-        ctx.moveTo(r.trail[0].x, r.trail[0].y);
-        for (let j = 1; j < r.trail.length; j++) {
-          ctx.lineTo(r.trail[j].x, r.trail[j].y);
-        }
+        ctx.moveTo(r.prevX, r.prevY);
+        ctx.lineTo(r.x, r.y);
         ctx.stroke();
 
-        // Rocket burning tip
-        ctx.fillStyle = "#ffffff";
-        ctx.beginPath();
-        ctx.arc(r.x, r.y, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-
-      // Drop sparkling sparks behind the climbing rocket
-      if (Math.random() > 0.3) {
-        sparksArray.push({
-          x: r.x + (Math.random() - 0.5) * 4,
-          y: r.y + 4,
-          prevX: r.x,
-          prevY: r.y + 2,
-          vx: (Math.random() - 0.5) * 1.5,
-          vy: Math.random() * 2 + 1.2,
-          color: "#ffab00",
-          alpha: 0.9,
-          decay: 0.035,
-          gravity: 0.15,
-          friction: 0.96,
-          flicker: true,
-          tailLength: 3,
-          history: [{ x: r.x, y: r.y }],
-        });
-      }
-
-      // Check if rocket reached apex or target height -> EXPLODE!
-      if (r.y <= r.targetY || r.vy >= -1.2) {
-        explodeRocket(r.sparksTarget, r.x, r.y, r.burstColors);
-        rocketsArray.splice(i, 1);
-      }
-    }
-
-    // 2. Update & Render Real Firecracker Streaks (NOT simple glowing dots)
-    for (let i = sparksArray.length - 1; i >= 0; i--) {
-      const p = sparksArray[i];
-      p.prevX = p.x;
-      p.prevY = p.y;
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += p.gravity;
-      p.vx *= p.friction;
-      p.vy *= p.friction;
-      p.alpha -= p.decay;
-
-      if (p.alpha <= 0) {
-        sparksArray.splice(i, 1);
-        continue;
-      }
-
-      p.history.push({ x: p.x, y: p.y });
-      if (p.history.length > p.tailLength) p.history.shift();
-
-      ctx.save();
-      const currentAlpha = p.flicker && Math.random() > 0.4 ? p.alpha * 0.5 : p.alpha;
-      ctx.globalAlpha = Math.max(0, currentAlpha);
-      ctx.strokeStyle = p.color;
-      ctx.lineWidth = Math.max(1, p.alpha * 2.2);
-      ctx.lineCap = "round";
-      ctx.shadowColor = p.color;
-      ctx.shadowBlur = 8;
-
-      // Draw real elongated streak matching particle motion
-      ctx.beginPath();
-      if (p.history.length > 1) {
-        ctx.moveTo(p.history[0].x, p.history[0].y);
-        for (let j = 1; j < p.history.length; j++) {
-          ctx.lineTo(p.history[j].x, p.history[j].y);
+        // Rocket explosion trigger
+        if (r.y <= r.targetY || r.vy >= -1.0) {
+          explodeRocket(r.x, r.y, r.colors);
+          rocketList.splice(i, 1);
         }
-      } else {
+      }
+
+      // 2. Process Sparks
+      for (let i = sparkList.length - 1; i >= 0; i--) {
+        const p = sparkList[i];
+        p.prevX = p.x;
+        p.prevY = p.y;
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy += 0.11; // Gravity arch
+        p.vx *= 0.975; // Friction
+        p.vy *= 0.975;
+        p.alpha -= p.decay;
+
+        if (p.alpha <= 0) {
+          sparkList.splice(i, 1);
+          continue;
+        }
+
+        // Draw spark streak
+        ctx.globalAlpha = p.alpha;
+        ctx.strokeStyle = p.color;
+        ctx.lineWidth = p.alpha > 0.5 ? 2 : 1.2;
+        ctx.beginPath();
         ctx.moveTo(p.prevX, p.prevY);
         ctx.lineTo(p.x, p.y);
+        ctx.stroke();
       }
-      ctx.stroke();
 
-      // White-hot spark tip at the front
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(p.x - 0.75, p.y - 0.75, 1.5, 1.5);
-      ctx.restore();
-    }
+      // Reset composite operation & alpha
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "source-over";
+
+      // Stop loop when all rockets and sparks are finished (0% idle CPU usage)
+      if (rocketList.length > 0 || sparkList.length > 0) {
+        animationFrameId.current = requestAnimationFrame(render);
+      } else {
+        isLoopRunning.current = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+      }
+    };
+
+    animationFrameId.current = requestAnimationFrame(render);
   };
 
-  // ─── 1. FIRST-TIME OPEN: ROCKETS LAUNCH FROM BOTTOM & BURST ACROSS VIEWPORT ───
-  useEffect(() => {
-    const welcomeCanvas = welcomeCanvasRef.current;
-    if (!welcomeCanvas) return;
-    const ctx = welcomeCanvas.getContext("2d");
-
-    const resize = () => {
-      welcomeCanvas.width = window.innerWidth;
-      welcomeCanvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener("resize", resize);
-
-    // Launch series of 4 rockets from the bottom of the screen on load
-    const launchSequence = [
-      { delay: 400, x: 0.28, targetY: 0.28 },
-      { delay: 750, x: 0.68, targetY: 0.24 },
-      { delay: 1100, x: 0.48, targetY: 0.32 },
-      { delay: 1550, x: 0.35, targetY: 0.22 },
-      { delay: 1950, x: 0.75, targetY: 0.30 },
-    ];
-
-    launchSequence.forEach(({ delay, x, targetY }) => {
-      setTimeout(() => {
-        if (welcomeCanvasRef.current) {
-          launchRocket(
-            welcomeRocketsRef.current,
-            welcomeSparksRef.current,
-            welcomeCanvas.width,
-            welcomeCanvas.height,
-            x,
-            targetY
-          );
-        }
-      }, delay);
-    });
-
-    let running = true;
-    const loop = () => {
-      if (!running) return;
-      processCanvasFrame(
-        ctx,
-        welcomeCanvas,
-        welcomeRocketsRef.current,
-        welcomeSparksRef.current
-      );
-      welcomeAnimationRef.current = requestAnimationFrame(loop);
-    };
-    loop();
-
-    const bannerTimer = setTimeout(() => {
-      setShowWelcomeBanner(false);
-    }, 7000);
-
-    return () => {
-      running = false;
-      clearTimeout(bannerTimer);
-      if (welcomeAnimationRef.current) cancelAnimationFrame(welcomeAnimationRef.current);
-      window.removeEventListener("resize", resize);
-    };
-  }, []);
-
-  // ─── 2. SECTION CANVAS: ROCKETS LAUNCH & BURST OVER THE SECTION ───
-  const triggerSectionRockets = (count = 4) => {
-    getAudioContext();
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    for (let i = 0; i < count; i++) {
-      setTimeout(() => {
-        const x = 0.18 + Math.random() * 0.64;
-        const targetY = 0.2 + Math.random() * 0.35;
-        launchRocket(
-          rocketsRef.current,
-          sparksRef.current,
-          canvas.width,
-          canvas.height,
-          x,
-          targetY
-        );
-      }, i * 320);
-    }
-  };
-
+  // ─── Lifecycle & Visibility Handling ───
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const ctx = canvas.getContext("2d");
 
     const resize = () => {
       const rect = canvas.getBoundingClientRect();
@@ -445,67 +272,57 @@ export default function FestivalSection() {
     resize();
     window.addEventListener("resize", resize);
 
-    let running = true;
-    const loop = () => {
-      if (!running) return;
-      processCanvasFrame(
-        ctx,
-        canvas,
-        rocketsRef.current,
-        sparksRef.current
-      );
-      animationRef.current = requestAnimationFrame(loop);
-    };
-    loop();
+    // Initial celebratory launch on first load (staggered, light)
+    const initialTimer = setTimeout(() => {
+      launchRocket(0.3, 0.28);
+      setTimeout(() => launchRocket(0.7, 0.24), 300);
+      setTimeout(() => launchRocket(0.5, 0.32), 650);
+    }, 400);
 
-    // Ambient rocket launch every 4.2 seconds in the section
-    const ambientTimer = setInterval(() => {
-      if (document.visibilityState === "visible" && canvasRef.current) {
-        const x = 0.2 + Math.random() * 0.6;
-        const targetY = 0.22 + Math.random() * 0.35;
-        launchRocket(
-          rocketsRef.current,
-          sparksRef.current,
-          canvas.width,
-          canvas.height,
-          x,
-          targetY
-        );
-      }
-    }, 4200);
+    // Pause when user scrolls out of view
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        isVisible.current = entry.isIntersecting;
+        if (entry.isIntersecting && (rockets.current.length > 0 || sparks.current.length > 0)) {
+          startAnimationLoop();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (sectionRef.current) observer.observe(sectionRef.current);
 
     return () => {
-      running = false;
-      clearInterval(ambientTimer);
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
+      clearTimeout(initialTimer);
+      if (animationFrameId.current) cancelAnimationFrame(animationFrameId.current);
       window.removeEventListener("resize", resize);
+      observer.disconnect();
     };
   }, []);
 
-  // Click on a Diya launches a rocket from below that specific Diya!
+  // Multi-rocket burst on button click
+  const triggerBurst = (count = 3) => {
+    getAudioContext();
+    for (let i = 0; i < count; i++) {
+      setTimeout(() => {
+        launchRocket(0.2 + Math.random() * 0.6, 0.2 + Math.random() * 0.3);
+      }, i * 260);
+    }
+  };
+
   const handleDiyaClick = (index) => {
     getAudioContext();
     const next = [...diyasLit];
     next[index] = true;
     setDiyasLit(next);
 
-    const canvas = canvasRef.current;
-    if (canvas) {
-      const xRatio = 0.18 + (index / (diyasLit.length - 1)) * 0.64;
-      launchRocket(
-        rocketsRef.current,
-        sparksRef.current,
-        canvas.width,
-        canvas.height,
-        xRatio,
-        0.24 + Math.random() * 0.2
-      );
-    }
+    const xRatio = 0.18 + (index / (diyasLit.length - 1)) * 0.64;
+    launchRocket(xRatio, 0.22 + Math.random() * 0.18);
   };
 
   const copyWish = () => {
     const text =
-      "✨ Happy Deepavali from ARISE Social Welfare Trust! 🪔 May this festival of lights illuminate your life with boundless joy, peace, and health. Join us in sharing light: https://arisesocialwelfaretrust.org";
+      "✨ Happy Deepavali from ARISE Social Welfare Trust! 🪔 May this festival of lights illuminate your life with boundless joy, peace, and health: https://arisesocialwelfaretrust.org";
     if (navigator.clipboard) {
       navigator.clipboard.writeText(text);
       setCopiedWish(true);
@@ -519,102 +336,21 @@ export default function FestivalSection() {
         dangerouslySetInnerHTML={{
           __html: `
         /* ═════════════════════════════════════════════════
-           FIRST-TIME OPEN WELCOME CATCH OVERLAY & BAR
-           ═════════════════════════════════════════════════ */
-        .deepavali-first-open-canvas {
-          position: fixed;
-          inset: 0;
-          width: 100vw;
-          height: 100vh;
-          pointer-events: none;
-          z-index: 9998;
-        }
-
-        .deepavali-catch-banner {
-          position: fixed;
-          top: 75px;
-          left: 50%;
-          transform: translateX(-50%);
-          z-index: 9999;
-          background: rgba(20, 10, 4, 0.94);
-          backdrop-filter: blur(14px);
-          border: 1.5px solid rgba(245, 158, 11, 0.7);
-          box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6), 0 0 35px rgba(245, 158, 11, 0.45);
-          border-radius: 9999px;
-          padding: 0.65rem 1.4rem;
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          color: #ffffff;
-          animation: bannerSlideDown 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
-          max-width: 92vw;
-        }
-
-        @keyframes bannerSlideDown {
-          from { transform: translate(-50%, -40px); opacity: 0; }
-          to   { transform: translate(-50%, 0); opacity: 1; }
-        }
-
-        .catch-banner-title {
-          font-family: var(--font-heading, "Outfit", sans-serif);
-          font-size: 0.95rem;
-          font-weight: 700;
-          color: #fef08a;
-          white-space: nowrap;
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-        }
-
-        .catch-banner-btn {
-          background: linear-gradient(135deg, #ea580c, #f59e0b);
-          color: #000 !important;
-          font-weight: 800;
-          font-size: 0.8rem;
-          padding: 0.35rem 0.95rem;
-          border-radius: 9999px;
-          border: none;
-          cursor: pointer;
-          white-space: nowrap;
-          box-shadow: 0 2px 10px rgba(245, 158, 11, 0.5);
-          transition: transform 0.2s ease;
-        }
-
-        .catch-banner-btn:hover {
-          transform: scale(1.05);
-        }
-
-        .catch-banner-close {
-          background: transparent;
-          border: none;
-          color: #cbd5e1;
-          font-size: 1.15rem;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          padding: 0 0.2rem;
-        }
-
-        .catch-banner-close:hover {
-          color: #ffffff;
-        }
-
-        /* ═════════════════════════════════════════════════
-           DEEPAVALI CELEBRATION SECTION (ABOVE 'WHO WE ARE')
-           Pure Festive Celebration • Real Rocket Crackers • No Tags
+           OPTIMIZED LIGHTWEIGHT DEEPAVALI SECTION
+           Silky-smooth 60fps • 0% Idle CPU • Zero Lag
            ═════════════════════════════════════════════════ */
         .deepavali-festive-section {
           position: relative;
-          background: radial-gradient(circle at 50% 20%, #261305 0%, #150902 60%, #0a0401 100%);
+          background: radial-gradient(circle at 50% 20%, #221004 0%, #120701 60%, #080301 100%);
           color: #ffffff;
-          padding: 5.5rem 1.5rem 5.5rem;
+          padding: 5rem 1.5rem 5rem;
           overflow: hidden;
           border-top: 2px solid rgba(245, 158, 11, 0.35);
           border-bottom: 2px solid rgba(245, 158, 11, 0.35);
           font-family: var(--font-sans, "Inter", sans-serif);
+          contain: layout paint;
         }
 
-        /* Section Cracker Canvas Overlay */
         .deepavali-section-canvas {
           position: absolute;
           inset: 0;
@@ -624,13 +360,12 @@ export default function FestivalSection() {
           z-index: 3;
         }
 
-        /* Ambient Festive Toran Ribbon */
         .deepavali-top-toran {
           position: absolute;
           top: 0;
           left: 0;
           right: 0;
-          height: 20px;
+          height: 18px;
           background: repeating-linear-gradient(
             90deg,
             #f59e0b 0px,
@@ -646,67 +381,48 @@ export default function FestivalSection() {
           border-bottom: 2px solid rgba(245, 158, 11, 0.4);
         }
 
-        /* Background Mandala Watermark */
         .deepavali-watermark-mandala {
           position: absolute;
           top: 50%;
           left: 50%;
           transform: translate(-50%, -50%);
-          width: 780px;
-          height: 780px;
-          opacity: 0.045;
+          width: 720px;
+          height: 720px;
+          opacity: 0.04;
           pointer-events: none;
-          animation: mandalaRotate 120s linear infinite;
-        }
-
-        @keyframes mandalaRotate {
-          from { transform: translate(-50%, -50%) rotate(0deg); }
-          to   { transform: translate(-50%, -50%) rotate(360deg); }
         }
 
         .deepavali-content-wrap {
-          max-width: 1020px;
+          max-width: 980px;
           margin: 0 auto;
           position: relative;
           z-index: 5;
           text-align: center;
         }
 
-        /* Festive Badge */
         .deepavali-top-pill {
           display: inline-flex;
           align-items: center;
-          gap: 0.65rem;
+          gap: 0.6rem;
           background: rgba(245, 158, 11, 0.15);
           border: 1px solid rgba(245, 158, 11, 0.55);
           color: #fbbf24;
-          font-size: 0.85rem;
+          font-size: 0.82rem;
           font-weight: 800;
           letter-spacing: 2px;
           text-transform: uppercase;
-          padding: 0.5rem 1.4rem;
+          padding: 0.45rem 1.35rem;
           border-radius: 9999px;
-          box-shadow: 0 0 25px rgba(245, 158, 11, 0.25);
-          margin-bottom: 1.6rem;
-          backdrop-filter: blur(8px);
+          box-shadow: 0 0 20px rgba(245, 158, 11, 0.2);
+          margin-bottom: 1.5rem;
         }
 
-        .pill-sparkle {
-          animation: sparkGlow 1.2s infinite alternate;
-        }
-
-        @keyframes sparkGlow {
-          from { transform: scale(1); opacity: 0.7; }
-          to   { transform: scale(1.35); opacity: 1; filter: drop-shadow(0 0 8px #fbbf24); }
-        }
-
-        /* Main Headline */
         .deepavali-hero-title {
           font-family: var(--font-heading, "Outfit", sans-serif);
-          font-size: clamp(2.4rem, 5.2vw, 4.4rem);
+          font-size: clamp(2.3rem, 5vw, 4rem);
           font-weight: 800;
           line-height: 1.15;
-          margin-bottom: 1.35rem;
+          margin-bottom: 1.25rem;
           letter-spacing: -0.025em;
           color: #ffffff;
         }
@@ -716,16 +432,14 @@ export default function FestivalSection() {
           background: linear-gradient(135deg, #fef08a 0%, #f59e0b 50%, #ea580c 100%);
           -webkit-background-clip: text;
           -webkit-text-fill-color: transparent;
-          text-shadow: 0 0 35px rgba(245, 158, 11, 0.45);
         }
 
-        /* Warm Message */
         .deepavali-desc {
-          font-size: clamp(1.05rem, 1.8vw, 1.25rem);
-          line-height: 1.8;
+          font-size: clamp(1rem, 1.6vw, 1.2rem);
+          line-height: 1.75;
           color: #fde68a;
-          max-width: 820px;
-          margin: 0 auto 2.8rem;
+          max-width: 800px;
+          margin: 0 auto 2.5rem;
           font-weight: 400;
         }
 
@@ -733,17 +447,16 @@ export default function FestivalSection() {
           display: block;
           font-weight: 700;
           color: #ffffff;
-          margin-top: 0.6rem;
-          letter-spacing: 1px;
+          margin-top: 0.5rem;
+          letter-spacing: 0.8px;
         }
 
-        /* ── 5 Interactive Glowing Diyas (Joy, Health, Light, Peace, Hope) ── */
         .deepavali-diyas-deck {
           display: flex;
           justify-content: center;
           align-items: center;
-          gap: 1.8rem;
-          margin-bottom: 3rem;
+          gap: 1.6rem;
+          margin-bottom: 2.8rem;
           flex-wrap: wrap;
         }
 
@@ -753,17 +466,17 @@ export default function FestivalSection() {
           align-items: center;
           cursor: pointer;
           user-select: none;
-          transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+          transition: transform 0.2s ease;
         }
 
         .diya-node:hover {
-          transform: translateY(-8px) scale(1.15);
+          transform: translateY(-6px) scale(1.1);
         }
 
         .diya-flame-holder {
           position: relative;
-          width: 62px;
-          height: 62px;
+          width: 58px;
+          height: 58px;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -771,100 +484,84 @@ export default function FestivalSection() {
 
         .diya-halo-ring {
           position: absolute;
-          inset: -4px;
+          inset: -3px;
           border-radius: 50%;
-          background: radial-gradient(circle, rgba(245, 158, 11, 0.55) 0%, rgba(245, 158, 11, 0) 70%);
-          animation: diyaAuraPulse 1.8s infinite ease-in-out;
-        }
-
-        @keyframes diyaAuraPulse {
-          0%, 100% { transform: scale(1); opacity: 0.6; }
-          50%      { transform: scale(1.25); opacity: 0.95; }
+          background: radial-gradient(circle, rgba(245, 158, 11, 0.45) 0%, rgba(245, 158, 11, 0) 70%);
         }
 
         .diya-lamp-icon {
-          font-size: 2.5rem;
-          filter: drop-shadow(0 0 14px rgba(245, 158, 11, 0.8));
-          transition: filter 0.3s ease;
-        }
-
-        .diya-node:hover .diya-lamp-icon {
-          filter: drop-shadow(0 0 24px rgba(254, 240, 138, 1));
+          font-size: 2.4rem;
+          filter: drop-shadow(0 0 12px rgba(245, 158, 11, 0.7));
         }
 
         .diya-name {
-          font-size: 0.76rem;
+          font-size: 0.74rem;
           font-weight: 700;
           color: #fde047;
-          margin-top: 0.25rem;
+          margin-top: 0.2rem;
           letter-spacing: 0.5px;
         }
 
-        /* ── Action Buttons (Burst Crackers • Share Wishes • Sound) ── */
         .deepavali-action-buttons {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 1.25rem;
+          gap: 1.2rem;
           flex-wrap: wrap;
         }
 
         .btn-celebrate-crackers {
           display: inline-flex;
           align-items: center;
-          gap: 0.65rem;
+          gap: 0.6rem;
           background: linear-gradient(135deg, #ea580c 0%, #f59e0b 50%, #eab308 100%);
           color: #0f0a05 !important;
-          font-size: 1.1rem;
+          font-size: 1.05rem;
           font-weight: 800;
-          padding: 1rem 2.4rem;
+          padding: 0.95rem 2.2rem;
           border-radius: 9999px;
           border: none;
           cursor: pointer;
-          box-shadow: 0 0 35px rgba(245, 158, 11, 0.6), 0 6px 20px rgba(0, 0, 0, 0.35);
-          transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+          box-shadow: 0 0 25px rgba(245, 158, 11, 0.5);
+          transition: transform 0.2s ease;
         }
 
         .btn-celebrate-crackers:hover {
-          transform: translateY(-3px) scale(1.05);
-          box-shadow: 0 0 50px rgba(245, 158, 11, 0.9);
+          transform: translateY(-2px) scale(1.03);
+          box-shadow: 0 0 35px rgba(245, 158, 11, 0.75);
         }
 
         .btn-share-greeting {
           display: inline-flex;
           align-items: center;
-          gap: 0.6rem;
+          gap: 0.55rem;
           background: rgba(255, 255, 255, 0.1);
           color: #ffffff !important;
           border: 1.5px solid rgba(245, 158, 11, 0.5);
-          font-size: 1.02rem;
+          font-size: 1rem;
           font-weight: 700;
-          padding: 0.95rem 1.9rem;
+          padding: 0.9rem 1.8rem;
           border-radius: 9999px;
           cursor: pointer;
-          backdrop-filter: blur(8px);
-          transition: all 0.25s ease;
+          transition: background 0.2s ease;
         }
 
         .btn-share-greeting:hover {
           background: rgba(245, 158, 11, 0.2);
-          border-color: #f59e0b;
-          transform: translateY(-2px);
-          box-shadow: 0 0 20px rgba(245, 158, 11, 0.3);
         }
 
         .btn-audio-toggle {
           display: inline-flex;
           align-items: center;
           gap: 0.45rem;
-          background: rgba(0, 0, 0, 0.45);
+          background: rgba(0, 0, 0, 0.4);
           border: 1px solid rgba(255, 255, 255, 0.2);
           color: #cbd5e1;
           font-size: 0.85rem;
           padding: 0.55rem 1.15rem;
           border-radius: 9999px;
           cursor: pointer;
-          transition: all 0.2s ease;
+          transition: border-color 0.2s ease;
         }
 
         .btn-audio-toggle:hover {
@@ -874,97 +571,44 @@ export default function FestivalSection() {
       ` }}
       />
 
-      {/* ── 1. FIRST-TIME OPEN CRACKER BLAST OVERLAY (Rockets launch from bottom) ── */}
-      <canvas className="deepavali-first-open-canvas" ref={welcomeCanvasRef} />
-
-      {showWelcomeBanner && (
-        <div className="deepavali-catch-banner">
-          <span className="catch-banner-title">
-            <span>🪔</span>
-            <span>Shubh Deepavali from ARISE Trust!</span>
-            <span>✨</span>
-          </span>
-
-          <button
-            className="catch-banner-btn"
-            onClick={() => {
-              getAudioContext();
-              const canvas = welcomeCanvasRef.current;
-              if (canvas) {
-                for (let i = 0; i < 4; i++) {
-                  setTimeout(() => {
-                    launchRocket(
-                      welcomeRocketsRef.current,
-                      welcomeSparksRef.current,
-                      canvas.width,
-                      canvas.height,
-                      0.2 + Math.random() * 0.6,
-                      0.2 + Math.random() * 0.35
-                    );
-                  }, i * 280);
-                }
-              }
-            }}
-          >
-            🎆 Launch Rockets!
-          </button>
-
-          <button
-            className="catch-banner-close"
-            onClick={() => setShowWelcomeBanner(false)}
-            title="Dismiss"
-            aria-label="Dismiss"
-          >
-            ×
-          </button>
-        </div>
-      )}
-
-      {/* ── 2. DEEPAVALI CELEBRATION SECTION (ABOVE 'WHO WE ARE') ── */}
+      {/* ── High-Performance Section Cracker Canvas ── */}
       <section
         className="deepavali-festive-section"
         id="deepavali-celebration"
         ref={sectionRef}
       >
-        {/* Festive Toran */}
         <div className="deepavali-top-toran" />
-
-        {/* Dynamic Section Cracker Canvas */}
         <canvas className="deepavali-section-canvas" ref={canvasRef} />
 
-        {/* Background Mandala */}
+        {/* Lightweight Watermark */}
         <svg
           className="deepavali-watermark-mandala"
           viewBox="0 0 400 400"
           xmlns="http://www.w3.org/2000/svg"
         >
-          <g fill="none" stroke="#f59e0b" strokeWidth="1.2">
-            <circle cx="200" cy="200" r="180" />
-            <circle cx="200" cy="200" r="140" strokeDasharray="5,5" />
-            <circle cx="200" cy="200" r="100" />
-            <circle cx="200" cy="200" r="60" strokeDasharray="3,3" />
-            <circle cx="200" cy="200" r="25" />
-            {[...Array(12)].map((_, i) => (
+          <g fill="none" stroke="#f59e0b" strokeWidth="1">
+            <circle cx="200" cy="200" r="170" />
+            <circle cx="200" cy="200" r="130" strokeDasharray="6,6" />
+            <circle cx="200" cy="200" r="80" />
+            {[...Array(8)].map((_, i) => (
               <line
                 key={i}
                 x1="200"
                 y1="200"
-                x2={200 + 180 * Math.cos((i * Math.PI) / 6)}
-                y2={200 + 180 * Math.sin((i * Math.PI) / 6)}
+                x2={200 + 170 * Math.cos((i * Math.PI) / 4)}
+                y2={200 + 170 * Math.sin((i * Math.PI) / 4)}
               />
             ))}
           </g>
         </svg>
 
         <div className="deepavali-content-wrap">
-          {/* Festive Badge */}
           <div className="deepavali-top-pill">
-            <span className="pill-sparkle">✨</span>
+            <span>✨</span>
             <span>SHUBH DEEPAVALI • FESTIVAL OF LIGHTS</span>
-            <span className="pill-sparkle">✨</span>
+            <span>✨</span>
           </div>
 
-          {/* Main Headline */}
           <h2 className="deepavali-hero-title">
             Happy Deepavali! <br />
             <span className="deepavali-title-glow">
@@ -972,7 +616,6 @@ export default function FestivalSection() {
             </span>
           </h2>
 
-          {/* Festive Blessing Message */}
           <p className="deepavali-desc">
             On this auspicious celebration of Deepavali, may the gentle glow of every lamp
             dispel darkness, bring good health, endless peace, and new beginnings for you
@@ -989,7 +632,7 @@ export default function FestivalSection() {
                 key={idx}
                 className="diya-node"
                 onClick={() => handleDiyaClick(idx)}
-                title="Click this Diya to shoot a rocket from it into the sky!"
+                title="Click this Diya to shoot a rocket into the sky!"
                 role="button"
                 tabIndex={0}
               >
@@ -1012,10 +655,10 @@ export default function FestivalSection() {
           <div className="deepavali-action-buttons">
             <button
               className="btn-celebrate-crackers"
-              onClick={() => triggerSectionRockets(4)}
-              title="Click to launch real sky rockets that shoot up and explode!"
+              onClick={() => triggerBurst(3)}
+              title="Click to launch sky rockets!"
             >
-              <span style={{ fontSize: "1.3rem" }}>🚀</span>
+              <span style={{ fontSize: "1.2rem" }}>🚀</span>
               <span>Launch Sky Crackers!</span>
             </button>
 
@@ -1033,7 +676,7 @@ export default function FestivalSection() {
                   playCrackerSound("blast");
                 }
               }}
-              title={soundEnabled ? "Mute rocket sound" : "Enable realistic rocket whistle & blast sound"}
+              title={soundEnabled ? "Mute sound" : "Enable sound"}
             >
               <span>{soundEnabled ? "🔊 Sound ON" : "🔇 Sound OFF"}</span>
             </button>
