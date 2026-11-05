@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 export default function FestivalSection() {
   const [diyasLit, setDiyasLit] = useState([true, true, true, true, true]);
   const [copiedWish, setCopiedWish] = useState(false);
-  const [soundEnabled, setSoundEnabled] = useState(false);
+  const [soundEnabled, setSoundEnabled] = useState(true);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(true);
 
   const canvasRef = useRef(null);
@@ -12,6 +12,7 @@ export default function FestivalSection() {
   const sectionRef = useRef(null);
   const animationRef = useRef(null);
   const welcomeAnimationRef = useRef(null);
+  const audioCtxRef = useRef(null);
 
   // Entities: rockets shooting from bottom, and firework spark streaks
   const rocketsRef = useRef([]);
@@ -19,47 +20,129 @@ export default function FestivalSection() {
   const welcomeRocketsRef = useRef([]);
   const welcomeSparksRef = useRef([]);
 
-  // Synthetic Web Audio firecracker sound (whistle + blast crackle)
+  // ─── Initialize / Resume Web Audio Context on User Gesture ───
+  const getAudioContext = () => {
+    if (typeof window === "undefined") return null;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return null;
+      if (!audioCtxRef.current) {
+        audioCtxRef.current = new AudioCtx();
+      }
+      if (audioCtxRef.current.state === "suspended") {
+        audioCtxRef.current.resume();
+      }
+      return audioCtxRef.current;
+    } catch {
+      return null;
+    }
+  };
+
+  // Warm up audio context on any user interaction anywhere on the page
+  useEffect(() => {
+    const unlockAudio = () => {
+      const ctx = getAudioContext();
+      if (ctx && ctx.state === "suspended") {
+        ctx.resume();
+      }
+    };
+
+    window.addEventListener("click", unlockAudio, { passive: true });
+    window.addEventListener("touchstart", unlockAudio, { passive: true });
+    window.addEventListener("keydown", unlockAudio, { passive: true });
+
+    return () => {
+      window.removeEventListener("click", unlockAudio);
+      window.removeEventListener("touchstart", unlockAudio);
+      window.removeEventListener("keydown", unlockAudio);
+    };
+  }, []);
+
+  // ─── Realistic Firecracker Sound Generator ───
   const playCrackerSound = (type = "blast") => {
     if (!soundEnabled) return;
     try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
+      const ctx = getAudioContext();
+      if (!ctx) return;
+      const now = ctx.currentTime;
 
       if (type === "launch") {
         // Rocket launch rising whistle
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.type = "sine";
-        osc.frequency.setValueAtTime(300, ctx.currentTime);
-        osc.frequency.exponentialRampToValueAtTime(1400, ctx.currentTime + 0.35);
-        gain.gain.setValueAtTime(0.12, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
-        osc.connect(gain);
+        osc.type = "sawtooth";
+        osc.frequency.setValueAtTime(320, now);
+        osc.frequency.exponentialRampToValueAtTime(1600, now + 0.32);
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.setValueAtTime(2200, now);
+
+        gain.gain.setValueAtTime(0.18, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+
+        osc.connect(filter);
+        filter.connect(gain);
         gain.connect(ctx.destination);
-        osc.start();
-        osc.stop(ctx.currentTime + 0.36);
+        osc.start(now);
+        osc.stop(now + 0.33);
       } else {
-        // Cracker explosion pop & crackle
-        const bufferSize = ctx.sampleRate * 0.18;
+        // 1. Deep Bass Boom (The heavy concussive explosion thud)
+        const boomOsc = ctx.createOscillator();
+        const boomGain = ctx.createGain();
+        boomOsc.type = "triangle";
+        boomOsc.frequency.setValueAtTime(140, now);
+        boomOsc.frequency.exponentialRampToValueAtTime(30, now + 0.22);
+
+        boomGain.gain.setValueAtTime(0.65, now);
+        boomGain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
+
+        boomOsc.connect(boomGain);
+        boomGain.connect(ctx.destination);
+        boomOsc.start(now);
+        boomOsc.stop(now + 0.26);
+
+        // 2. Gunpowder Snap & Crackle (Bandpass filtered white noise)
+        const bufferSize = Math.floor(ctx.sampleRate * 0.22);
         const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
         const data = buffer.getChannelData(0);
         for (let i = 0; i < bufferSize; i++) {
-          data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.3));
+          const decay = Math.exp(-i / (bufferSize * 0.25));
+          const crackle = Math.random() > 0.82 ? (Math.random() * 2 - 1) * 1.6 : (Math.random() * 2 - 1) * 0.4;
+          data[i] = crackle * decay;
         }
+
         const noise = ctx.createBufferSource();
         noise.buffer = buffer;
-        const filter = ctx.createBiquadFilter();
-        filter.type = "bandpass";
-        filter.frequency.value = 850 + Math.random() * 450;
-        const gain = ctx.createGain();
-        gain.gain.setValueAtTime(0.3, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.18);
-        noise.connect(filter);
-        filter.connect(gain);
-        gain.connect(ctx.destination);
-        noise.start();
+
+        const bandpass = ctx.createBiquadFilter();
+        bandpass.type = "bandpass";
+        bandpass.frequency.setValueAtTime(1100 + Math.random() * 400, now);
+        bandpass.Q.setValueAtTime(1.8, now);
+
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.75, now);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+        noise.connect(bandpass);
+        bandpass.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        noise.start(now);
+
+        // 3. Trailing Sizzle Crackles (sparklers sizzling)
+        for (let s = 1; s <= 3; s++) {
+          const popTime = now + 0.05 * s + Math.random() * 0.03;
+          const popOsc = ctx.createOscillator();
+          const popGain = ctx.createGain();
+          popOsc.type = "square";
+          popOsc.frequency.setValueAtTime(900 + Math.random() * 700, popTime);
+          popGain.gain.setValueAtTime(0.12, popTime);
+          popGain.gain.exponentialRampToValueAtTime(0.001, popTime + 0.035);
+          popOsc.connect(popGain);
+          popGain.connect(ctx.destination);
+          popOsc.start(popTime);
+          popOsc.stop(popTime + 0.04);
+        }
       }
     } catch {
       // Audio autoplay restrictions; fail silently
@@ -329,6 +412,7 @@ export default function FestivalSection() {
 
   // ─── 2. SECTION CANVAS: ROCKETS LAUNCH & BURST OVER THE SECTION ───
   const triggerSectionRockets = (count = 4) => {
+    getAudioContext();
     const canvas = canvasRef.current;
     if (!canvas) return;
 
@@ -374,7 +458,7 @@ export default function FestivalSection() {
     };
     loop();
 
-    // Ambient rocket launch every 4 seconds in the section
+    // Ambient rocket launch every 4.2 seconds in the section
     const ambientTimer = setInterval(() => {
       if (document.visibilityState === "visible" && canvasRef.current) {
         const x = 0.2 + Math.random() * 0.6;
@@ -400,6 +484,7 @@ export default function FestivalSection() {
 
   // Click on a Diya launches a rocket from below that specific Diya!
   const handleDiyaClick = (index) => {
+    getAudioContext();
     const next = [...diyasLit];
     next[index] = true;
     setDiyasLit(next);
@@ -803,6 +888,7 @@ export default function FestivalSection() {
           <button
             className="catch-banner-btn"
             onClick={() => {
+              getAudioContext();
               const canvas = welcomeCanvasRef.current;
               if (canvas) {
                 for (let i = 0; i < 4; i++) {
@@ -942,7 +1028,10 @@ export default function FestivalSection() {
               onClick={() => {
                 const next = !soundEnabled;
                 setSoundEnabled(next);
-                if (next) playCrackerSound("launch");
+                if (next) {
+                  getAudioContext();
+                  playCrackerSound("blast");
+                }
               }}
               title={soundEnabled ? "Mute rocket sound" : "Enable realistic rocket whistle & blast sound"}
             >
