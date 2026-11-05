@@ -151,19 +151,19 @@ export default function FestivalSection() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    // Hard limit on active rockets to avoid performance degradation
+    // Limit active climbing rockets for smooth 60fps performance
     if (rockets.current.length >= 8) return;
 
     const x = canvas.width * startXRatio;
     const targetY = canvas.height * targetYRatio;
 
     const colors = [
-      ["#ff3b30", "#ff9500", "#ffcc00"],
-      ["#ff9500", "#ffd60a", "#ffffff"],
-      ["#34c759", "#30d158", "#ffd60a"],
-      ["#00c7be", "#32ade6", "#ffffff"],
-      ["#af52de", "#bf5af2", "#ffd60a"],
-      ["#ffd60a", "#ff9f0a", "#ff453a"],
+      ["#ff3b30", "#ff9500", "#ffd60a", "#ffffff"],
+      ["#ff9500", "#ffd60a", "#ff2d55", "#ffffff"],
+      ["#34c759", "#30d158", "#ffd60a", "#ffffff"],
+      ["#00c7be", "#32ade6", "#007aff", "#ffffff"],
+      ["#af52de", "#bf5af2", "#ffd60a", "#ffffff"],
+      ["#ffd60a", "#ff9f0a", "#ff3b30", "#ffffff"],
     ];
     const burstColorSet = colors[Math.floor(Math.random() * colors.length)];
 
@@ -174,27 +174,25 @@ export default function FestivalSection() {
       y: canvas.height,
       prevX: x,
       prevY: canvas.height,
-      vx: (Math.random() - 0.5) * 1.5,
-      vy: -(12 + Math.random() * 3.5),
+      vx: (Math.random() - 0.5) * 1.6,
+      vy: -(11.5 + Math.random() * 3.8),
       targetY,
       colors: burstColorSet,
+      trail: [],
     });
 
     startAnimationLoop();
   };
 
-  // ─── Real Firecracker Burst (Hardware Accelerated 'lighter' streaks) ───
+  // ─── Real Firecracker Burst (Radiant Streaks & Glitter Sizzle) ───
   const explodeRocket = (x, y, colors) => {
     playCrackerSound("blast");
 
-    // Cap maximum sparks at 50 to maintain solid 60fps on all devices
-    const count = 45 + Math.floor(Math.random() * 15);
-    const availableSlots = 180 - sparks.current.length;
-    const finalCount = Math.min(count, Math.max(10, availableSlots));
-
-    for (let i = 0; i < finalCount; i++) {
-      const angle = (Math.PI * 2 * i) / finalCount + (Math.random() - 0.5) * 0.25;
-      const speed = 2.4 + Math.random() * 5.2;
+    // 1. Full-Scale Radiant Star Streaks (The real firecracker burst)
+    const starCount = 75 + Math.floor(Math.random() * 25);
+    for (let i = 0; i < starCount; i++) {
+      const angle = (Math.PI * 2 * i) / starCount + (Math.random() - 0.5) * 0.28;
+      const speed = 2.6 + Math.random() * 6.4;
       const color = colors[i % colors.length];
 
       sparks.current.push({
@@ -206,9 +204,38 @@ export default function FestivalSection() {
         vy: Math.sin(angle) * speed,
         color,
         alpha: 1,
-        decay: 0.018 + Math.random() * 0.016, // Fast cleanup
+        decay: 0.013 + Math.random() * 0.015,
+        gravity: 0.11,
+        friction: 0.97,
+        flicker: Math.random() > 0.35,
+        trailLength: 3.2 + Math.random() * 2.2,
+        isGlitter: false,
       });
     }
+
+    // 2. Micro Crackling Glitter Sizzle Sparks (Diwali star sizzle)
+    for (let k = 0; k < 26; k++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 1.2 + Math.random() * 3.6;
+      sparks.current.push({
+        x: x + (Math.random() - 0.5) * 8,
+        y: y + (Math.random() - 0.5) * 8,
+        prevX: x,
+        prevY: y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 0.6,
+        color: Math.random() > 0.5 ? "#ffffff" : "#ffd700",
+        alpha: 1,
+        decay: 0.022 + Math.random() * 0.02,
+        gravity: 0.14,
+        friction: 0.95,
+        flicker: true,
+        trailLength: 1.8,
+        isGlitter: true,
+      });
+    }
+
+    startAnimationLoop();
   };
 
   // ─── Optimized Render Loop (Runs ONLY when particles exist) ───
@@ -226,46 +253,80 @@ export default function FestivalSection() {
       const ctx = canvas.getContext("2d");
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Hardware-accelerated additive blending (creates neon glow with ZERO CPU shadowBlur)
+      // Hardware-accelerated additive blending (creates vivid glow with 0 shadowBlur CPU lag)
       ctx.globalCompositeOperation = "lighter";
 
       const rocketList = rockets.current;
       const sparkList = sparks.current;
 
-      // 1. Process Rockets
+      // 1. Process Rockets climbing into the sky
       for (let i = rocketList.length - 1; i >= 0; i--) {
         const r = rocketList[i];
         r.prevX = r.x;
         r.prevY = r.y;
         r.x += r.vx;
         r.y += r.vy;
-        r.vy += 0.14; // Gravity deceleration
+        r.vy += 0.09; // slight gravity slowing rocket ascent
 
-        // Draw rocket blazing streak (direct line, zero array shift overhead)
-        ctx.strokeStyle = "#ffd60a";
-        ctx.lineWidth = 2.5;
+        r.trail.push({ x: r.x, y: r.y });
+        if (r.trail.length > 7) r.trail.shift();
+
+        // Draw climbing rocket burning trail
+        ctx.strokeStyle = "rgba(255, 200, 60, 0.9)";
+        ctx.lineWidth = 2.4;
+        ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.moveTo(r.prevX, r.prevY);
-        ctx.lineTo(r.x, r.y);
+        if (r.trail.length > 1) {
+          ctx.moveTo(r.trail[0].x, r.trail[0].y);
+          for (let j = 1; j < r.trail.length; j++) {
+            ctx.lineTo(r.trail[j].x, r.trail[j].y);
+          }
+        }
         ctx.stroke();
 
-        // Rocket explosion trigger
+        // White burning rocket head
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(r.x, r.y, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Drop sparkling embers behind climbing rocket
+        if (Math.random() > 0.35) {
+          sparkList.push({
+            x: r.x + (Math.random() - 0.5) * 4,
+            y: r.y + 3,
+            prevX: r.x,
+            prevY: r.y + 1,
+            vx: (Math.random() - 0.5) * 1.2,
+            vy: Math.random() * 1.8 + 1.0,
+            color: "#ffaa00",
+            alpha: 0.85,
+            decay: 0.035,
+            gravity: 0.12,
+            friction: 0.96,
+            flicker: true,
+            trailLength: 1.5,
+            isGlitter: true,
+          });
+        }
+
+        // Rocket explosion trigger at apex or target height
         if (r.y <= r.targetY || r.vy >= -1.0) {
           explodeRocket(r.x, r.y, r.colors);
           rocketList.splice(i, 1);
         }
       }
 
-      // 2. Process Sparks
+      // 2. Process Real Firecracker Streaks & Glitter Sizzle
       for (let i = sparkList.length - 1; i >= 0; i--) {
         const p = sparkList[i];
         p.prevX = p.x;
         p.prevY = p.y;
         p.x += p.vx;
         p.y += p.vy;
-        p.vy += 0.11; // Gravity arch
-        p.vx *= 0.975; // Friction
-        p.vy *= 0.975;
+        p.vy += p.gravity;
+        p.vx *= p.friction;
+        p.vy *= p.friction;
         p.alpha -= p.decay;
 
         if (p.alpha <= 0) {
@@ -273,14 +334,31 @@ export default function FestivalSection() {
           continue;
         }
 
-        // Draw spark streak
-        ctx.globalAlpha = p.alpha;
+        const alpha = p.flicker && Math.random() > 0.35 ? p.alpha * 0.55 : p.alpha;
+        ctx.globalAlpha = Math.max(0, alpha);
+
+        // Radiant Motion Streak (extrapolated from velocity for solid 60fps)
         ctx.strokeStyle = p.color;
-        ctx.lineWidth = p.alpha > 0.5 ? 2 : 1.2;
+        ctx.lineWidth = p.isGlitter ? 1.2 : 2.0;
+        ctx.lineCap = "round";
         ctx.beginPath();
-        ctx.moveTo(p.prevX, p.prevY);
+        ctx.moveTo(p.prevX - p.vx * p.trailLength, p.prevY - p.vy * p.trailLength);
         ctx.lineTo(p.x, p.y);
         ctx.stroke();
+
+        // Star glowing tip
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.isGlitter ? 1.2 : 1.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // White-hot center on high-energy sparks
+        if (!p.isGlitter && p.alpha > 0.45) {
+          ctx.fillStyle = "#ffffff";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 0.9, 0, Math.PI * 2);
+          ctx.fill();
+        }
       }
 
       // Reset composite operation & alpha
