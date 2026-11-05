@@ -7,25 +7,37 @@ export const metadata = {
 };
 
 export default function VideosPage() {
-  // Replace these with actual Video IDs and paths
+  // ⚠️ Replace these YouTube video IDs with your actual IDs from youtube.com/@ariseswt
   const videoList = [
     {
       type: "youtube",
-      title: "ARISE Introduction & Vision",
-      videoId: "dQw4w9WgXcQ", // Replace with your actual YouTube video ID!
-      description: "Learn more about our core mantra: Learn | Earn | Return.",
+      title: "ARISE Social Welfare Trust — Introduction & Vision",
+      videoId: "REPLACE_WITH_ACTUAL_ID_1",
+      description: "An overview of who we are, our core mantra (Learn | Earn | Return), and the communities we serve across Chennai.",
     },
     {
       type: "youtube",
-      title: "Community Outreach 2026",
-      videoId: "3JZ_D3ELwOQ", // Replace with your actual YouTube video ID!
-      description: "Highlights from our recent community outreach programs.",
+      title: "Stationery Distribution Drive 2026 — Vivek Vihar Tuition Centre",
+      videoId: "REPLACE_WITH_ACTUAL_ID_2",
+      description: "Watch highlights from our June 2026 stationery drive where 200+ students received notebooks, bags, and textbooks.",
     },
     {
-      type: "local",
-      title: "Behind The Scenes (Not on YouTube)",
-      url: "/storage/files/placeholder-video.mp4", // Upload an mp4 to public/storage/files/ and update this path
-      description: "Exclusive footage of our team preparing for the Stationery Distribution Programme.",
+      type: "youtube",
+      title: "Tree Plantation Campaign — Mangadu, Chennai",
+      videoId: "REPLACE_WITH_ACTUAL_ID_3",
+      description: "Our monthly green drive where volunteers planted 300+ native saplings across schools and public parks in Chennai.",
+    },
+    {
+      type: "youtube",
+      title: "Elder Welfare Health Camp — October 2025",
+      videoId: "REPLACE_WITH_ACTUAL_ID_4",
+      description: "A glimpse into our elder care health camp where 120+ senior citizens received free medical consultations and medicines.",
+    },
+    {
+      type: "youtube",
+      title: "Festival Celebration at Old Age Home — Pongal 2026",
+      videoId: "REPLACE_WITH_ACTUAL_ID_5",
+      description: "ARISE volunteers celebrated Pongal with elders at our partner old age homes — with food, clothes, and joy.",
     },
   ];
 
